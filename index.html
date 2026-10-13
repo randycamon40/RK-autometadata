@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AutoMeta AI">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Auto Metadata AI</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f6fa; color: #1f2937; font-size: 14px;
+    overscroll-behavior-y: contain;
+  }
+  /* FIX #2: padding bawah cukup untuk bottom nav + safe area */
+  body {
+    padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    min-height: 100vh;
+  }
+
+  /* ============ HEADER ============ */
+  .app-header {
+    position: sticky; top: 0; z-index: 50;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: #fff; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 10px rgba(79,70,229,.25);
+    min-height: 56px;
+  }
+  .app-header .title-wrap { display: flex; flex-direction: column; min-width: 0; }
+  .app-header h1 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app-header small { opacity: .85; font-size: 10px; margin-top: 2px; }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 9px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; white-space: nowrap;
+    flex-shrink: 0; margin-left: 8px;
+  }
+  .status-unknown   { background: rgba(255,255,255,.2); color: #fff; }
+  .status-connected { background: #10b981; color: #fff; }
+  .status-failed    { background: #ef4444; color: #fff; }
+  .status-testing   { background: #f59e0b; color: #fff; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ============ SCREENS ============ */
+  .screen { display: none; padding: 12px; max-width: 720px; margin: 0 auto; }
+  .screen.active { display: block; animation: fadeIn .18s ease; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ============ CARD ============ */
+  .card {
+    background: #fff; border-radius: 14px; padding: 14px;
+    margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .card h2 {
+    margin: 0 0 10px; font-size: 13px; font-weight: 700;
+    color: #4f46e5; text-transform: uppercase; letter-spacing: .5px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ============ FORM ============ */
+  label { display: block; font-size: 12px; font-weight: 600; color: #4b5563; margin: 10px 0 4px; }
+  input[type="text"], input[type="password"], input[type="number"], select, textarea {
+    width: 100%; padding: 11px 12px; border: 1.5px solid #e5e7eb; border-radius: 10px;
+    font-size: 14px; background: #fff; color: #1f2937; font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79,70,229,.1);
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  select {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 34px;
+  }
+
+  /* ============ BUTTONS ============ */
+  button {
+    width: 100%; padding: 12px; border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+    transition: transform .05s, opacity .15s, background .15s;
+  }
+  button:active { transform: scale(.98); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,.3); }
+  .btn-secondary { background: #eef2ff; color: #4f46e5; }
+  .btn-danger { background: #fee2e2; color: #991b1b; }
+
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; min-width: 0; }
+
+  /* ============ CHECKBOX ============ */
+  .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+  .checkbox-row input[type="checkbox"] {
+    width: 20px; height: 20px; accent-color: #4f46e5; flex-shrink: 0;
+  }
+  .checkbox-row label { margin: 0; font-weight: 500; font-size: 13px; }
+
+  /* ============ RANGE (FIX #4: track + thumb WebKit & Firefox) ============ */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 22px; background: transparent;
+    outline: none; margin: 6px 0; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px; background: #e5e7eb; border-radius: 999px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; margin-top: -8px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    border-radius: 50%; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(79,70,229,.4);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 6px; background: #e5e7eb; border-radius: 999px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px; height: 22px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    border-radius: 50%; border: none; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(79,70,229,.4);
+  }
+
+  /* ============ HINT ============ */
+  .hint { font-size: 11px; color: #6b7280; margin-top: 6px; line-height: 1.45; }
+
+  /* ============ LOG ============ */
+  .log-panel { background: #0f172a; border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+  .log-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; color: #fff; font-size: 12px; font-weight: 700;
+    background: #1e293b;
+  }
+  .log-header .log-title { display: flex; align-items: center; gap: 6px; }
+  .log-header button {
+    background: #334155; color: #fff; padding: 5px 12px; font-size: 11px;
+    border-radius: 8px; width: auto; font-weight: 600;
+  }
+  #logBody {
+    padding: 10px 14px; max-height: 280px; overflow-y: auto;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 11px; line-height: 1.6; color: #cbd5e1;
+  }
+  #logBody:empty::before {
+    content: "Log akan muncul di sini...";
+    color: #64748b; font-style: italic;
+  }
+  .log-line { padding: 1px 0; word-break: break-all; }
+  .log-info    { color: #cbd5e1; }
+  .log-success { color: #4ade80; }
+  .log-error   { color: #f87171; }
+  .log-warn    { color: #fbbf24; }
+
+  /* ============ FILE LIST ============ */
+  .file-list { max-height: 260px; overflow-y: auto; margin-top: 8px; }
+  .file-item {
+    padding: 8px 10px; background: #f9fafb; border-radius: 8px;
+    margin-bottom: 6px; display: flex; align-items: center; gap: 10px;
+    font-size: 12px;
+  }
+  .file-item img { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+  .file-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-item .badge {
+    padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .badge-pending { background: #e5e7eb; color: #6b7280; }
+  .badge-process { background: #fef3c7; color: #92400e; }
+  .badge-success { background: #d1fae5; color: #065f46; }
+  .badge-error   { background: #fee2e2; color: #991b1b; }
+
+  /* ============ PROGRESS ============ */
+  .progress-wrap { margin-top: 12px; }
+  .progress-bar {
+    height: 8px; background: #e5e7eb; border-radius: 999px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, #4f46e5, #7c3aed);
+    width: 0%; transition: width .3s; border-radius: 999px;
+  }
+  .progress-text { font-size: 11px; color: #6b7280; margin-top: 6px; text-align: center; }
+
+  /* ============ RESULT ITEM ============ */
+  .result-item {
+    background: #f9fafb; border-radius: 10px; padding: 10px 12px;
+    margin-bottom: 8px; border-left: 3px solid #4f46e5;
+  }
+  .result-item.error { border-left-color: #ef4444; background: #fef2f2; }
+  .result-item .r-name { font-size: 11px; color: #6b7280; margin-bottom: 4px; word-break: break-all; }
+  .result-item .r-title { font-size: 13px; font-weight: 700; color: #1f2937; margin-bottom: 4px; }
+  .result-item .r-desc { font-size: 12px; color: #4b5563; margin-bottom: 6px; line-height: 1.4; }
+  .result-item .r-kw { font-size: 11px; color: #4f46e5; line-height: 1.5; }
+  .result-item .r-err { font-size: 12px; color: #dc2626; }
+
+  .empty-state {
+    text-align: center; padding: 28px 12px; color: #9ca3af;
+    font-size: 12px; line-height: 1.5;
+  }
+  .empty-state .big { font-size: 32px; display: block; margin-bottom: 8px; opacity: .5; }
+
+  /* ============ BOTTOM NAV ============ */
+  .bottom-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+    background: rgba(255,255,255,.98);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-top: 1px solid #e5e7eb;
+    display: flex; justify-content: space-around; align-items: stretch;
+    padding: 6px 4px max(6px, env(safe-area-inset-bottom, 6px));
+    box-shadow: 0 -2px 10px rgba(0,0,0,.04);
+  }
+  .nav-item {
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    padding: 8px 4px; border-radius: 10px; cursor: pointer;
+    background: none; border: none; width: auto;
+    color: #9ca3af; font-weight: 600;
+    transition: color .15s, background .15s;
+    position: relative;
+  }
+  .nav-item.active { color: #4f46e5; background: #eef2ff; }
+  .nav-item .nav-icon { font-size: 20px; line-height: 1; }
+  .nav-item .nav-label { font-size: 10px; letter-spacing: .2px; }
+  /* FIX #5: badge presisi di atas icon, tidak bergantung lebar teks */
+  .nav-item .nav-badge {
+    position: absolute; top: 2px; right: 50%;
+    transform: translateX(14px);
+    background: #ef4444; color: #fff; font-size: 9px; font-weight: 700;
+    min-width: 16px; height: 16px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px; line-height: 1;
+  }
+  .nav-item .nav-badge:empty { display: none; }
+
+  /* ============ UTIL ============ */
+  .hidden {
+    position: absolute !important;
+    width: 1px !important; height: 1px !important;
+    padding: 0 !important; margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="app-header">
+  <div class="title-wrap">
+    <h1>🎨 Auto Metadata AI</h1>
+    <small>Batch generate + auto rename + CSV</small>
+  </div>
+  <div id="aiStatus" class="status-badge status-unknown">
+    <span class="dot"></span><span id="aiStatusText">Offline</span>
+  </div>
+</header>
+
+<!-- ============ SCREEN: SETUP ============ -->
+<section id="screen-setup" class="screen active">
+  <div class="card">
+    <h2>⚙️ Konfigurasi AI</h2>
+
+    <label>Provider</label>
+    <select id="provider">
+      <option value="gemini">Google Gemini</option>
+      <option value="openai">OpenAI</option>
+      <option value="openrouter">OpenRouter</option>
+      <option value="groq">Groq</option>
+      <option value="mistral">Mistral</option>
+      <option value="custom">Custom (OpenAI-compatible)</option>
+    </select>
+
+    <label>Model</label>
+    <select id="model"></select>
+    <input type="text" id="modelCustom" class="hidden" placeholder="nama-model custom">
+
+    <label>API Key</label>
+    <input type="password" id="apiKey" placeholder="Masukkan API key...">
+
+    <div id="baseUrlWrap" class="hidden">
+      <label>Base URL (Custom)</label>
+      <input type="text" id="baseUrl" placeholder="https://api.example.com/v1">
+    </div>
+
+    <button class="btn-secondary" id="btnTest" style="margin-top:14px;">🔌 Tes Koneksi</button>
+  </div>
+
+  <div class="card">
+    <h2>📂 Folder Output</h2>
+    <button class="btn-secondary" id="btnPickOutput">Pilih Folder Output</button>
+    <div class="hint" id="outputLabel">Belum dipilih — pilih folder tujuan (misal Download/RK-autometadata). Fallback: unduh ke Download dengan prefix RK-autometadata_</div>
+  </div>
+</section>
+
+<!-- ============ SCREEN: FILES ============ -->
+<section id="screen-files" class="screen">
+  <div class="card">
+    <h2>📁 Input File</h2>
+    <input type="file" id="fileInput" multiple class="hidden">
+    <input type="file" id="fileInputGallery" multiple accept="image/*" class="hidden">
+    <div class="row">
+      <button class="btn-secondary" id="btnPickFiles">📁 File Manager</button>
+      <button class="btn-secondary" id="btnPickGallery">🖼️ Galeri</button>
+    </div>
+    <div class="hint" id="fileCount">Belum ada file dipilih</div>
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+  <div class="card">
+    <h2>🎯 Opsi Generate</h2>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="autoTitle" checked>
+      <label for="autoTitle">Auto Judul (rename file pakai title AI)</label>
+    </div>
+
+    <label style="margin-top:8px;">Jumlah Keyword: <span id="kwLabel">25</span></label>
+    <input type="range" id="kwCount" min="5" max="50" value="25" step="1">
+
+    <label>Delay antar file (hindari rate limit)</label>
+    <select id="delayBetween">
+      <option value="5000">5 detik</option>
+      <option value="8000">8 detik</option>
+      <option value="10000" selected>10 detik</option>
+      <option value="15000">15 detik</option>
+      <option value="20000">20 detik</option>
+    </select>
+
+    <label>Bahasa Output</label>
+    <select id="lang">
+      <option value="Indonesia">Indonesia</option>
+      <option value="English">English</option>
+    </select>
+
+    <label style="margin-top:14px;">Platform CSV (centang yang diinginkan)</label>
+    <div class="checkbox-row"><input type="checkbox" id="csv_adobe" checked><label for="csv_adobe">Adobe Stock</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="csv_shutterstock" checked><label for="csv_shutterstock">Shutterstock</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="csv_vecteezy" checked><label for="csv_vecteezy">Vecteezy</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="csv_123rf" checked><label for="csv_123rf">123RF</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="csv_dreamstime"><label for="csv_dreamstime">Dreamstime</label></div>
+  </div>
+</section>
+
+<!-- ============ SCREEN: PROCESS ============ -->
+<section id="screen-process" class="screen">
+  <div class="card">
+    <h2>🚀 Jalankan</h2>
+    <button class="btn-primary" id="btnRun">Generate Metadata</button>
+    <button class="btn-danger" id="btnStop" style="margin-top:8px; display:none;">⏹ Hentikan</button>
+
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">Siap</div>
+    </div>
+  </div>
+
+  <div class="log-panel">
+    <div class="log-header">
+      <span class="log-title">📋 Log</span>
+      <button id="btnClearLog">Hapus</button>
+    </div>
+    <div id="logBody"></div>
+  </div>
+</section>
+
+<!-- ============ SCREEN: RESULTS ============ -->
+<section id="screen-results" class="screen">
+  <div class="card" id="resultCard">
+    <h2>📊 Hasil Generate</h2>
+    <div id="resultList">
+      <div class="empty-state">
+        <span class="big">📭</span>
+        Belum ada hasil.<br>Buka tab <strong>Proses</strong> dan jalankan generate.
+      </div>
+    </div>
+    <button class="btn-primary" id="btnSaveOutput" style="margin-top:12px;">💾 Simpan ke Folder Output</button>
+    <div class="hint" id="saveHint">Belum ada hasil untuk disimpan</div>
+  </div>
+</section>
+
+<!-- ============ BOTTOM NAV ============ -->
+<nav class="bottom-nav">
+  <button class="nav-item active" data-target="setup" type="button">
+    <span class="nav-icon">⚙️</span>
+    <span class="nav-label">Setup</span>
+  </button>
+  <button class="nav-item" data-target="files" type="button">
+    <span class="nav-icon">📁</span>
+    <span class="nav-label">File</span>
+    <span class="nav-badge" id="navBadgeFiles"></span>
+  </button>
+  <button class="nav-item" data-target="process" type="button">
+    <span class="nav-icon">🚀</span>
+    <span class="nav-label">Proses</span>
+  </button>
+  <button class="nav-item" data-target="results" type="button">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Hasil</span>
+    <span class="nav-badge" id="navBadgeResults"></span>
+  </button>
+</nav>
+
+<script>
+/* =========================================================
+ * AUTO METADATA AI — Single File App
+ * ========================================================= */
+
+const PROVIDERS = {
+  gemini: {
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    defaultModel: 'gemini-3.8-flash',
+    type: 'gemini'
+  },
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o-mini',
+    type: 'openai'
+  },
+  openrouter: {
+    baseUrl: 'https://openrouter.ai/api/v1',
+    defaultModel: 'google/gemma-4-26b-a4b-it:free',
+    type: 'openai'
+  },
+  groq: {
+    baseUrl: 'https://api.groq.com/openai/v1',
+    defaultModel: 'qwen/qwen3.8-27b',
+    type: 'openai'
+  },
+  mistral: {
+    baseUrl: 'https://api.mistral.ai/v1',
+    defaultModel: 'pixtral-12b-2409',
+    type: 'openai'
+  },
+  custom: {
+    baseUrl: '',
+    defaultModel: '',
+    type: 'openai'
+  }
+};
+
+const MODEL_OPTIONS = {
+  gemini: [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.8-flash-lite',
+    'gemini-3.5-flash-lite'
+  ],
+  openai: [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4.1',
+    'gpt-5',
+    'gpt-5.5'
+  ],
+  openrouter: [
+    'google/gemma-4-26b-a4b-it:free',
+    'qwen/qwen3.7-flash:free',
+    'nvidia/nemotron-nano-12b-v2-vl:free',
+    'google/gemma-4-31b-it:free',
+    'qwen/qwen2.5-vl-72b-instruct:free'
+  ],
+  groq: [
+    'qwen/qwen3.8-27b',
+    'qwen/qwen3.6-27b',
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'meta-llama/llama-4-maverick-17b-128e-instruct'
+  ],
+  mistral: [
+    'pixtral-large-latest',
+    'pixtral-12b-2409',
+    'mistral-medium-3.5'
+  ]
+};
+
+const state = {
+  files: [],
+  results: [],
+  outputDir: null,
+  running: false,
+  stopFlag: false,
+  usedNames: new Set()
+};
+
+/* ===================== UI HELPERS ===================== */
+
+const $ = id => document.getElementById(id);
+
+function log(msg, level = 'info') {
+  const body = $('logBody');
+  const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
+  const line = document.createElement('div');
+  line.className = `log-line log-${level}`;
+  line.textContent = `[${time}] ${msg}`;
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+  while (body.children.length > 500) body.removeChild(body.firstChild);
+}
+
+function setStatus(stateName, text) {
+  const el = $('aiStatus');
+  el.className = `status-badge status-${stateName}`;
+  $('aiStatusText').textContent = text;
+}
+
+function setProgress(current, total, label) {
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  $('progressFill').style.width = pct + '%';
+  $('progressText').textContent = `${label} — ${current}/${total} (${pct}%)`;
+}
+
+/* ===================== NAVIGATION ===================== */
+
+function switchScreen(target) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const screen = document.getElementById('screen-' + target);
+  const navItem = document.querySelector(`.nav-item[data-target="${target}"]`);
+  if (screen) screen.classList.add('active');
+  if (navItem) navItem.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function updateNavBadges() {
+  const filesBadge = $('navBadgeFiles');
+  const resultsBadge = $('navBadgeResults');
+  if (filesBadge) filesBadge.textContent = state.files.length > 0 ? String(state.files.length) : '';
+  const okCount = state.results.filter(r => r.status === 'success').length;
+  if (resultsBadge) resultsBadge.textContent = okCount > 0 ? String(okCount) : '';
+}
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => switchScreen(item.dataset.target));
+});
+
+/* ===================== PROVIDER HANDLERS ===================== */
+
+function getProviderConfig() {
+  const p = $('provider').value;
+  const cfg = { ...PROVIDERS[p] };
+  if (p === 'custom') {
+    cfg.baseUrl = $('baseUrl').value.trim().replace(/\/$/, '');
+    cfg.defaultModel = getModelValue();
+  }
+  return { id: p, ...cfg };
+}
+
+async function testConnection() {
+  const apiKey = $('apiKey').value.trim();
+  if (!apiKey) { setStatus('failed', 'Isi API Key'); log('API key kosong', 'error'); return false; }
+
+  const cfg = getProviderConfig();
+  if (cfg.type === 'openai' && !cfg.baseUrl) {
+    setStatus('failed', 'Base URL kosong');
+    log('❌ Base URL wajib diisi untuk provider ini', 'error');
+    return false;
+  }
+  setStatus('testing', 'Menguji...');
+  log(`Menguji koneksi ${cfg.id}...`, 'info');
+
+  try {
+    let url, headers = {};
+    if (cfg.type === 'gemini') {
+      url = `${cfg.baseUrl}/models?key=${apiKey}`;
+    } else {
+      url = `${cfg.baseUrl}/models`;
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status} — ${txt.slice(0, 100)}`);
+    }
+    setStatus('connected', 'AI Terkoneksi');
+    log(`✅ ${cfg.id} terhubung`, 'success');
+    return true;
+  } catch (e) {
+    setStatus('failed', 'Gagal');
+    log(`❌ Koneksi gagal: ${e.message}`, 'error');
+    return false;
+  }
+}
+
+/* ===================== IMAGE → BASE64 ===================== */
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ===================== PROMPT BUILDER ===================== */
+
+function buildPrompt(keywordCount, autoTitle, lang) {
+  return `Analisis gambar ini. Berikan output HANYA berupa JSON valid (tanpa markdown, tanpa penjelasan).
+
+Format JSON:
+{
+  ${autoTitle ? '"title": "judul singkat maksimal 10 kata, tanpa tanda koma",' : ''}
+  "description": "deskripsi 1-2 kalimat",
+  "keywords": ["keyword1", "keyword2", "... tepat ${keywordCount} buah"],
+  "category": "kategori singkat dalam bahasa Inggris (contoh: Nature, Business, Technology)"
+}
+
+Aturan:
+- Bahasa: ${lang}
+- Jumlah keywords: tepat ${keywordCount} buah
+- Urutkan keywords dari paling relevan
+- Title: tanpa koma, tanpa tanda kutip, ringkas dan deskriptif
+- Hanya output JSON, tidak ada teks lain.`;
+}
+
+/* ===================== AI CALLS ===================== */
+
+function parseJSONSafe(text) {
+  try { return JSON.parse(text); } catch (e) {}
+  const cleaned = String(text).replace(/```json/gi, '').replace(/```/g, '').trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    return JSON.parse(cleaned.slice(start, end + 1));
+  }
+  throw new Error('Gagal parse JSON dari AI');
+}
+
+async function callGemini(apiKey, base64, mimeType, prompt, model) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType, data: base64 } }
+        ]
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.7
+      }
+    })
+  });
+  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Response Gemini kosong');
+  return parseJSONSafe(text);
+}
+
+async function callOpenAICompatible(baseUrl, apiKey, base64, mimeType, prompt, model, providerId) {
+  const _noJsonMode = ['mistral', 'custom'].includes(providerId);
+  const _payload = {
+    model,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }
+      ]
+    }],
+    temperature: 0.7
+  };
+  if (!_noJsonMode) _payload.response_format = { type: 'json_object' };
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(_payload)
+  });
+  if (!res.ok) throw new Error(`API HTTP ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Response API kosong');
+  return parseJSONSafe(text);
+}
+
+async function callAI(base64, mimeType, prompt) {
+  const cfg = getProviderConfig();
+  const apiKey = $('apiKey').value.trim();
+  const model = (getModelValue() || cfg.defaultModel);
+
+  if (!apiKey) throw new Error('API key kosong');
+  if (!model) throw new Error('Model kosong');
+
+  if (cfg.type === 'gemini') {
+    return callGemini(apiKey, base64, mimeType, prompt, model);
+  } else {
+    return callOpenAICompatible(cfg.baseUrl, apiKey, base64, mimeType, prompt, model, cfg.id);
+  }
+}
+
+/* ===================== RETRY WRAPPER ===================== */
+
+async function withRetry(fn, maxRetries = 4) {
+  let lastErr;
+  for (let i = 0; i < maxRetries; i++) {
+    if (state.stopFlag) throw new Error('Dibatalkan oleh user');
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const wait = Math.min(2000 * Math.pow(2, i), 20000);
+      log(`  ⚠️ Percobaan ${i + 1}/${maxRetries} gagal: ${e.message.slice(0, 80)}. Tunggu ${wait/1000}s`, 'warn');
+      let elapsed = 0;
+      while (elapsed < wait) {
+        if (state.stopFlag) throw new Error('Dibatalkan oleh user');
+        await new Promise(r => setTimeout(r, 250));
+        elapsed += 250;
+      }
+    }
+  }
+  throw lastErr;
+}
+
+/* ===================== FILENAME HELPERS ===================== */
+
+function sanitizeFilename(title) {
+  const words = String(title || 'untitled')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6);
+  return words.join('_') || 'untitled';
+}
+
+function buildOutputName(originalName, aiTitle, usedNames) {
+  const base = sanitizeFilename(aiTitle);
+  const ext = (originalName.match(/\.[^.]+$/) || [''])[0];
+  let candidate = base + ext;
+  let counter = 1;
+  while (usedNames.has(candidate)) {
+    candidate = `${base}_${String(counter).padStart(2, '0')}${ext}`;
+    counter++;
+  }
+  usedNames.add(candidate);
+  return candidate;
+}
+
+function ensureUniqueName(originalName, usedNames) {
+  if (!usedNames.has(originalName)) {
+    usedNames.add(originalName);
+    return originalName;
+  }
+  const ext = (originalName.match(/\.[^.]+$/) || [''])[0];
+  const base = originalName.slice(0, originalName.length - ext.length);
+  let counter = 1;
+  let candidate = `${base}_${String(counter).padStart(2, '0')}${ext}`;
+  while (usedNames.has(candidate)) {
+    counter++;
+    candidate = `${base}_${String(counter).padStart(2, '0')}${ext}`;
+  }
+  usedNames.add(candidate);
+  return candidate;
+}
+
+/* ===================== CSV BUILDERS ===================== */
+
+function toCSV(rows) {
+  return rows.map(row =>
+    row.map(cell => {
+      const s = String(cell ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')
+  ).join('\r\n');
+}
+
+function buildAdobeCSV(results) {
+  const rows = [['Filename', 'Title', 'Keywords', 'Category', 'Releases']];
+  for (const r of results) {
+    if (r.status !== 'success') continue;
+    rows.push([
+      r.outputName,
+      (r.metadata.title || '').slice(0, 70).replace(/,/g, ''),
+      (r.metadata.keywords || []).slice(0, 50).join(','),
+      r.metadata.category || '',
+      ''
+    ]);
+  }
+  return toCSV(rows);
+}
+
+function buildShutterstockCSV(results) {
+  const rows = [['Filename', 'Description', 'Keywords', 'Categories', 'Illustration', 'Mature', 'Editorial']];
+  for (const r of results) {
+    if (r.status !== 'success') continue;
+    rows.push([
+      r.outputName,
+      r.metadata.description || r.metadata.title || '',
+      (r.metadata.keywords || []).join(','),
+      r.metadata.category || '',
+      'No', 'No', 'No'
+    ]);
+  }
+  return toCSV(rows);
+}
+
+function buildVecteezyCSV(results) {
+  const rows = [['Filename', 'Title', 'Description', 'Keywords']];
+  for (const r of results) {
+    if (r.status !== 'success') continue;
+    const nameNoExt = r.outputName.replace(/\.[^.]+$/, '');
+    rows.push([
+      nameNoExt,
+      r.metadata.title || '',
+      r.metadata.description || '',
+      (r.metadata.keywords || []).join(',')
+    ]);
+  }
+  return toCSV(rows);
+}
+
+function build123rfCSV(results) {
+  const rows = [['oldfilename', '123rf_filename', 'description', 'keywords', 'country']];
+  for (const r of results) {
+    if (r.status !== 'success') continue;
+    rows.push([
+      r.originalName,
+      r.outputName,
+      r.metadata.description || r.metadata.title || '',
+      (r.metadata.keywords || []).join(','),
+      ''
+    ]);
+  }
+  return toCSV(rows);
+}
+
+function buildDreamstimeCSV(results) {
+  const rows = [['Filename', 'Title', 'Description', 'Keywords', 'Category', 'Released']];
+  for (const r of results) {
+    if (r.status !== 'success') continue;
+    rows.push([
+      r.outputName,
+      r.metadata.title || '',
+      r.metadata.description || '',
+      (r.metadata.keywords || []).join(','),
+      r.metadata.category || '',
+      ''
+    ]);
+  }
+  return toCSV(rows);
+}
+
+/* ===================== FILE WRITE ===================== */
+
+async function writeFileToDir(dirHandle, name, content) {
+  const handle = await dirHandle.getFileHandle(name, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(content);
+  await writable.close();
+}
+
+async function writeMetadataFolder(outputDir, results) {
+  const metaDir = await outputDir.getDirectoryHandle('metadata', { create: true });
+  const tasks = [];
+
+  if ($('csv_adobe').checked) tasks.push(['adobe_stock.csv', buildAdobeCSV(results)]);
+  if ($('csv_shutterstock').checked) tasks.push(['shutterstock.csv', buildShutterstockCSV(results)]);
+  if ($('csv_vecteezy').checked) tasks.push(['vecteezy.csv', buildVecteezyCSV(results)]);
+  if ($('csv_123rf').checked) tasks.push(['123rf.csv', build123rfCSV(results)]);
+  if ($('csv_dreamstime').checked) tasks.push(['dreamstime.csv', buildDreamstimeCSV(results)]);
+
+  for (const [name, content] of tasks) {
+    try {
+      await writeFileToDir(metaDir, name, new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8' }));
+      log(`✅ CSV dibuat: metadata/${name}`, 'success');
+    } catch (e) {
+      log(`❌ Gagal tulis ${name}: ${e.message}`, 'error');
+    }
+  }
+}
+
+/* ===================== DOWNLOAD FALLBACK ===================== */
+
+function downloadBlob(blob, filename) {
+  const safeName = 'RK-autometadata_' + filename.replace(/\//g, '_');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = safeName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ===================== FILE LIST UI ===================== */
+
+function renderFileList() {
+  const list = $('fileList');
+  list.innerHTML = '';
+  state.files.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    img.onload = () => URL.revokeObjectURL(img.src);
+    img.onerror = () => URL.revokeObjectURL(img.src);
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = f.name;
+    const badge = document.createElement('span');
+    badge.className = 'badge badge-pending';
+    badge.textContent = 'Menunggu';
+    badge.id = `badge-${i}`;
+    div.appendChild(img);
+    div.appendChild(name);
+    div.appendChild(badge);
+    list.appendChild(div);
+  });
+  $('fileCount').textContent = state.files.length
+    ? `${state.files.length} file dipilih`
+    : 'Belum ada file dipilih';
+  updateNavBadges();
+}
+
+function updateBadge(index, status) {
+  const badge = document.getElementById(`badge-${index}`);
+  if (!badge) return;
+  badge.className = 'badge badge-' + status;
+  const labels = { pending: 'Menunggu', process: 'Proses...', success: 'Sukses', error: 'Gagal' };
+  badge.textContent = labels[status] || status;
+}
+
+/* ===================== MAIN PROCESS ===================== */
+
+async function runBatch() {
+  if (state.running) return;
+  if (state.files.length === 0) { log('Pilih file dulu', 'warn'); return; }
+
+  const apiKey = $('apiKey').value.trim();
+  if (!apiKey) { log('API key kosong', 'error'); return; }
+
+  state.running = true;
+  state.stopFlag = false;
+  state.results = [];
+  state.usedNames = new Set();
+  const _filesSnapshot = state.files.slice();
+  const _totalFiles = _filesSnapshot.length;
+  updateNavBadges();
+
+  $('resultList').innerHTML = '<div class="empty-state"><span class="big">⏳</span>Sedang memproses...</div>';
+  $('saveHint').textContent = 'Proses sedang berjalan...';
+
+  $('btnRun').disabled = true;
+  $('btnStop').style.display = 'block';
+  $('btnStop').disabled = false;
+  $('btnStop').textContent = '⏹ Hentikan';
+  setProgress(0, _totalFiles, 'Mulai');
+  log(`🚀 Mulai proses ${_totalFiles} file...`, 'info');
+
+  const keywordCount = parseInt($('kwCount').value, 10);
+  const autoTitle = $('autoTitle').checked;
+  const lang = $('lang').value;
+  const prompt = buildPrompt(keywordCount, autoTitle, lang);
+
+  let success = 0, failed = 0;
+
+  for (let i = 0; i < _totalFiles; i++) {
+    if (state.stopFlag) { log('⏹ Dihentikan oleh user', 'warn'); break; }
+
+    const file = _filesSnapshot[i];
+    updateBadge(i, 'process');
+    setProgress(i, _totalFiles, `Proses: ${file.name}`);
+    log(`📷 [${i + 1}/${state.files.length}] ${file.name}`, 'info');
+
+    try {
+      const base64 = await fileToBase64(file);
+      const mimeType = file.type || 'image/jpeg';
+
+      const metadata = await withRetry(() => callAI(base64, mimeType, prompt));
+      if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
+        metadata.keywords = [];
+      }
+
+      let outputName;
+      if (autoTitle && metadata.title) {
+        outputName = buildOutputName(file.name, metadata.title, state.usedNames);
+      } else {
+        outputName = ensureUniqueName(file.name, state.usedNames);
+      }
+
+      state.results.push({
+        originalName: file.name,
+        outputName,
+        metadata,
+        status: 'success',
+        _file: file
+      });
+
+      updateBadge(i, 'success');
+      success++;
+      log(`  ✅ Sukses — "${metadata.title || '(no title)'}" (${metadata.keywords.length} keyword)`, 'success');
+
+    } catch (e) {
+      state.results.push({
+        originalName: file.name,
+        outputName: file.name,
+        metadata: {},
+        status: 'error',
+        error: e.message
+      });
+      updateBadge(i, 'error');
+      failed++;
+      log(`  ❌ Gagal: ${e.message}`, 'error');
+    }
+
+    setProgress(i + 1, _totalFiles, 'Selesai');
+    const _delayMs = parseInt($('delayBetween').value, 10) || 5000;
+    if (_delayMs > 0 && i < _totalFiles - 1 && !state.stopFlag) {
+      log(`  ⏳ Jeda ${_delayMs/1000}s sebelum file berikutnya...`, 'info');
+      let _elapsed = 0;
+      while (_elapsed < _delayMs && !state.stopFlag) {
+        await new Promise(r => setTimeout(r, 250));
+        _elapsed += 250;
+      }
+    }
+  }
+
+  renderResultPreview();
+  updateNavBadges();
+
+  log(`🏁 Selesai! Sukses: ${success}, Gagal: ${failed}`, success > 0 ? 'success' : 'warn');
+
+  // FIX #3: progress tidak lompat ke 100% kalau dihentikan user
+  const processed = success + failed;
+  if (state.stopFlag && processed < _totalFiles) {
+    setProgress(processed, _totalFiles, 'Dihentikan');
+  } else {
+    setProgress(_totalFiles, _totalFiles, 'Selesai');
+  }
+
+  state.running = false;
+  $('btnRun').disabled = false;
+  $('btnStop').style.display = 'none';
+  $('btnStop').disabled = false;
+  $('btnStop').textContent = '⏹ Hentikan';
+}
+
+/* ===================== EVENT LISTENERS ===================== */
+
+function populateModelDropdown(providerId, defaultModel) {
+  const sel = $('model');
+  sel.innerHTML = '';
+  const list = MODEL_OPTIONS[providerId] || [];
+  if (list.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = defaultModel || '';
+    opt.textContent = defaultModel || '(kosong)';
+    sel.appendChild(opt);
+    return;
+  }
+  list.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    sel.appendChild(opt);
+  });
+  if (defaultModel && list.includes(defaultModel)) {
+    sel.value = defaultModel;
+  } else {
+    sel.value = list[0];
+  }
+}
+
+function getModelValue() {
+  if ($('provider').value === 'custom') {
+    return $('modelCustom').value.trim();
+  }
+  return $('model').value.trim();
+}
+
+$('provider').addEventListener('change', () => {
+  const p = $('provider').value;
+  const cfg = PROVIDERS[p];
+  if (!cfg) return;
+  if (p === 'custom') {
+    $('model').classList.add('hidden');
+    $('modelCustom').classList.remove('hidden');
+    $('modelCustom').value = cfg.defaultModel || '';
+    $('baseUrlWrap').classList.remove('hidden');
+  } else {
+    $('model').classList.remove('hidden');
+    $('modelCustom').classList.add('hidden');
+    $('baseUrlWrap').classList.add('hidden');
+    populateModelDropdown(p, cfg.defaultModel);
+  }
+});
+
+$('kwCount').addEventListener('input', e => {
+  $('kwLabel').textContent = e.target.value;
+});
+
+$('btnTest').addEventListener('click', testConnection);
+
+$('btnPickFiles').addEventListener('click', () => $('fileInput').click());
+$('btnPickGallery').addEventListener('click', () => $('fileInputGallery').click());
+
+$('fileInputGallery').addEventListener('change', e => {
+  const all = Array.from(e.target.files);
+  const isImg = (f) => (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(f.name);
+  const images = all.filter(isImg);
+  const skipped = all.length - images.length;
+  state.files = images;
+  renderFileList();
+  if (skipped > 0) log('⚠️ ' + skipped + ' file non-gambar dilewati (hanya gambar yang didukung)', 'warn');
+  log('📁 ' + state.files.length + ' file dipilih via Galeri', 'info');
+  e.target.value = '';
+});
+
+$('fileInput').addEventListener('change', e => {
+  const all = Array.from(e.target.files);
+  const isImg = (f) => (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(f.name);
+  const images = all.filter(isImg);
+  const skipped = all.length - images.length;
+  state.files = images;
+  renderFileList();
+  if (skipped > 0) log('⚠️ ' + skipped + ' file non-gambar dilewati (hanya gambar yang didukung)', 'warn');
+  log('📁 ' + state.files.length + ' file dipilih via File Manager', 'info');
+  e.target.value = '';
+});
+
+$('btnPickOutput').addEventListener('click', async () => {
+  if (!window.showDirectoryPicker) {
+    log('❌ Browser tidak mendukung File System Access API', 'error');
+    $('outputLabel').textContent = 'Browser tidak mendukung — CSV akan diunduh per file';
+    return;
+  }
+  try {
+    state.outputDir = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' });
+    $('outputLabel').textContent = `📂 ${state.outputDir.name}`;
+    log(`📂 Folder output: ${state.outputDir.name}`, 'success');
+  } catch (e) {
+    log(`❌ Gagal pilih folder: ${e.message}`, 'error');
+  }
+});
+
+$('btnRun').addEventListener('click', runBatch);
+
+$('btnStop').addEventListener('click', () => {
+  state.stopFlag = true;
+  $('btnStop').disabled = true;
+  $('btnStop').textContent = '⏳ Menghentikan...';
+  log('⏹ Permintaan berhenti — menunggu file saat ini selesai...', 'warn');
+});
+
+$('btnClearLog').addEventListener('click', () => $('logBody').innerHTML = '');
+
+/* ===================== HASIL PREVIEW & SAVE ===================== */
+
+function renderResultPreview() {
+  const list = $('resultList');
+  list.innerHTML = '';
+  if (state.results.length === 0) {
+    list.innerHTML = '<div class="empty-state"><span class="big">📭</span>Belum ada hasil.<br>Buka tab <strong>Proses</strong> dan jalankan generate.</div>';
+    return;
+  }
+
+  for (const r of state.results) {
+    const div = document.createElement('div');
+    if (r.status === 'success') {
+      div.className = 'result-item';
+      const kw = (r.metadata.keywords || []).join(', ');
+      const title = (r.metadata.title || '(tanpa judul)');
+      const desc = (r.metadata.description || '');
+      const rName = document.createElement('div'); rName.className = 'r-name';
+      rName.textContent = '📷 ' + r.originalName + ' → ' + r.outputName;
+      const rTitle = document.createElement('div'); rTitle.className = 'r-title';
+      rTitle.textContent = title;
+      const rDesc = document.createElement('div'); rDesc.className = 'r-desc';
+      rDesc.textContent = desc;
+      const rKw = document.createElement('div'); rKw.className = 'r-kw';
+      rKw.textContent = kw || '(tanpa keyword)';
+      div.appendChild(rName); div.appendChild(rTitle); div.appendChild(rDesc); div.appendChild(rKw);
+    } else {
+      div.className = 'result-item error';
+      const rName = document.createElement('div'); rName.className = 'r-name';
+      rName.textContent = '📷 ' + r.originalName;
+      const rErr = document.createElement('div'); rErr.className = 'r-err';
+      rErr.textContent = '❌ Gagal: ' + (r.error || 'unknown error');
+      div.appendChild(rName); div.appendChild(rErr);
+    }
+    list.appendChild(div);
+  }
+
+  const okCount = state.results.filter(r => r.status === 'success').length;
+  $('saveHint').textContent = okCount + ' file siap disimpan';
+  log('📊 Preview ditampilkan: ' + okCount + ' sukses', 'info');
+}
+
+async function saveResultsToOutput() {
+  const okResults = state.results.filter(r => r.status === 'success');
+  if (okResults.length === 0) {
+    log('⚠️ Tidak ada hasil untuk disimpan', 'warn');
+    return;
+  }
+
+  $('btnSaveOutput').disabled = true;
+  log('💾 Menyimpan ' + okResults.length + ' file...', 'info');
+  let saved = 0, failed = 0;
+
+  if (state.outputDir) {
+    for (const r of okResults) {
+      try {
+        const blob = r._file.slice(0, r._file.size, r._file.type);
+        await writeFileToDir(state.outputDir, r.outputName, blob);
+        saved++;
+        log('  💾 ' + r.outputName, 'success');
+      } catch (e) {
+        failed++;
+        log('  ❌ Gagal simpan ' + r.outputName + ': ' + e.message, 'error');
+      }
+    }
+    log('📝 Menulis CSV metadata...', 'info');
+    await writeMetadataFolder(state.outputDir, state.results);
+  } else {
+    for (const r of okResults) {
+      try {
+        const blob = r._file.slice(0, r._file.size, r._file.type);
+        downloadBlob(blob, r.outputName);
+        saved++;
+      } catch (e) {
+        failed++;
+        log('  ❌ Gagal unduh ' + r.outputName + ': ' + e.message, 'error');
+      }
+      await new Promise(res => setTimeout(res, 200));
+    }
+    const csvs = [];
+    if ($('csv_adobe').checked) csvs.push(['adobe_stock.csv', buildAdobeCSV(state.results)]);
+    if ($('csv_shutterstock').checked) csvs.push(['shutterstock.csv', buildShutterstockCSV(state.results)]);
+    if ($('csv_vecteezy').checked) csvs.push(['vecteezy.csv', buildVecteezyCSV(state.results)]);
+    if ($('csv_123rf').checked) csvs.push(['123rf.csv', build123rfCSV(state.results)]);
+    if ($('csv_dreamstime').checked) csvs.push(['dreamstime.csv', buildDreamstimeCSV(state.results)]);
+    for (const [name, content] of csvs) {
+      downloadBlob(new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8' }), name);
+      log('  📥 Diunduh: RK-autometadata_' + name, 'success');
+      await new Promise(res => setTimeout(res, 200));
+    }
+  }
+
+  log('🏁 Selesai! Tersimpan: ' + saved + ', Gagal: ' + failed, saved > 0 ? 'success' : 'warn');
+  $('saveHint').textContent = '✅ ' + saved + ' file tersimpan di ' + (state.outputDir ? state.outputDir.name : 'folder Download');
+  $('btnSaveOutput').disabled = false;
+}
+
+$('btnSaveOutput').addEventListener('click', saveResultsToOutput);
+
+/* ===================== INIT ===================== */
+
+(function init() {
+  const CFG_KEY = 'rk_autometadata_cfg';
+
+  // FIX #1: track apakah model dropdown sudah di-populate, agar tidak menimpa
+  // model yang di-restore dari localStorage.
+  let modelInitialized = false;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    if (saved.provider && PROVIDERS[saved.provider]) {
+      $('provider').value = saved.provider;
+      $('provider').dispatchEvent(new Event('change'));
+      modelInitialized = true;
+    }
+    if (saved.model) {
+      modelInitialized = true;
+      if ($('provider').value === 'custom') {
+        $('modelCustom').value = saved.model;
+      } else {
+        const sel = $('model');
+        let found = false;
+        for (const opt of sel.options) {
+          if (opt.value === saved.model) { sel.value = saved.model; found = true; break; }
+        }
+        if (!found) {
+          const opt = document.createElement('option');
+          opt.value = saved.model;
+          opt.textContent = saved.model + ' (custom)';
+          sel.appendChild(opt);
+          sel.value = saved.model;
+        }
+      }
+    }
+    if (saved.apiKey) $('apiKey').value = saved.apiKey;
+    if (saved.baseUrl) $('baseUrl').value = saved.baseUrl;
+    if (saved.provider === 'custom') {
+      $('baseUrlWrap').classList.remove('hidden');
+    }
+    if (saved.apiKey) {
+      setStatus('unknown', 'Perlu tes ulang');
+      log('💾 Config dipulihkan dari browser', 'info');
+    }
+  } catch (e) {
+    log('⚠️ Gagal restore config: ' + e.message, 'warn');
+  }
+
+  // Populate dropdown hanya jika belum (first-time load)
+  if (!modelInitialized) {
+    const initProvider = $('provider').value;
+    if (initProvider === 'custom') {
+      $('model').classList.add('hidden');
+      $('modelCustom').classList.remove('hidden');
+      if (!$('modelCustom').value) $('modelCustom').value = PROVIDERS.custom.defaultModel || '';
+    } else {
+      $('model').classList.remove('hidden');
+      $('modelCustom').classList.add('hidden');
+      populateModelDropdown(initProvider, PROVIDERS[initProvider].defaultModel);
+    }
+  }
+
+  const saveConfig = () => {
+    try {
+      localStorage.setItem(CFG_KEY, JSON.stringify({
+        provider: $('provider').value,
+        model: getModelValue(),
+        apiKey: $('apiKey').value,
+        baseUrl: $('baseUrl').value
+      }));
+    } catch (e) {}
+  };
+  ['provider', 'model', 'modelCustom', 'apiKey', 'baseUrl'].forEach(id => {
+    $(id).addEventListener('input', saveConfig);
+    $(id).addEventListener('change', saveConfig);
+  });
+
+  updateNavBadges();
+  log('✅ Aplikasi siap. Isi API key & tes koneksi.', 'info');
+
+  // Fix #4: sembunyikan bottom nav saat keyboard Android muncul
+  if (window.visualViewport) {
+    const _nav = document.querySelector('.bottom-nav');
+    const _check = () => {
+      const diff = window.innerHeight - window.visualViewport.height;
+      _nav.style.display = (diff > 150) ? 'none' : '';
+    };
+    window.visualViewport.addEventListener('resize', _check);
+    window.visualViewport.addEventListener('scroll', _check);
+  }
+
+  // Register Service Worker (PWA)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('serviceworker.js')
+        .then((reg) => {
+          log('✅ Service Worker terdaftar', 'success');
+          reg.update().catch(() => {});
+        })
+        .catch((err) => {
+          log('⚠️ Service Worker gagal: ' + err.message, 'warn');
+        });
+    });
+  }
+})();
+</script>
+</body>
+</html>
