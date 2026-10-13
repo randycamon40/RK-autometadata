@@ -180,6 +180,19 @@
     padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 700;
     flex-shrink: 0;
   }
+  .file-item .btn-remove {
+    width: 28px; height: 28px; min-width: 28px;
+    padding: 0; border-radius: 50%;
+    background: #fee2e2; color: #991b1b;
+    font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer; line-height: 1;
+    transition: background .15s, transform .1s;
+  }
+  .file-item .btn-remove:hover { background: #fecaca; }
+  .file-item .btn-remove:active { transform: scale(.9); }
+  .file-item .btn-remove:disabled { cursor: not-allowed; transform: none; opacity: .4; }
   .badge-pending { background: #e5e7eb; color: #6b7280; }
   .badge-process { background: #fef3c7; color: #92400e; }
   .badge-success { background: #d1fae5; color: #065f46; }
@@ -931,9 +944,25 @@ function renderFileList() {
     badge.className = 'badge badge-pending';
     badge.textContent = 'Menunggu';
     badge.id = `badge-${i}`;
+    const btnRemove = document.createElement('button');
+    btnRemove.type = 'button';
+    btnRemove.className = 'btn-remove';
+    btnRemove.textContent = '✕';
+    btnRemove.title = 'Hapus file';
+    btnRemove.setAttribute('aria-label', 'Hapus file');
+    if (state.running) {
+      btnRemove.disabled = true;
+    } else {
+      btnRemove.addEventListener('click', () => {
+        state.files.splice(i, 1);
+        renderFileList();
+        log('🗑️ File dihapus: ' + f.name, 'info');
+      });
+    }
     div.appendChild(img);
     div.appendChild(name);
     div.appendChild(badge);
+    div.appendChild(btnRemove);
     list.appendChild(div);
   });
   $('fileCount').textContent = state.files.length
