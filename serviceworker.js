@@ -3,7 +3,7 @@
  * Cache app shell, biarkan API call lewat network
  * ========================================================= */
 
-const CACHE_NAME = 'autometadata-v1';
+const CACHE_NAME = 'autometadata-v1.1';
 
 // File yang di-cache saat install (app shell)
 const APP_SHELL = [
